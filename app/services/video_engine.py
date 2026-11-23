@@ -115,20 +115,24 @@ class VideoEngine:
             return 8.0
 
     def extract_thumbnail(self, mp4_path: Path, out_jpg_path: Path) -> Path:
-        """Grab one JPEG frame for Cloudflare Images thumbnail."""
+        """Grab a vivid mid-action JPEG frame (with burned title & subtitle) for cover thumbnail."""
         ffmpeg = self.settings.resolve_ffmpeg_bin()
+        dur = self.probe_duration(mp4_path)
+        seek_sec = min(2.5, max(0.5, dur * 0.25))
         subprocess.run(
             [
                 ffmpeg,
                 "-y",
                 "-ss",
-                "00:00:00.5",
+                f"{seek_sec:.2f}",
                 "-i",
                 str(mp4_path),
                 "-frames:v",
                 "1",
+                "-vf",
+                "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920",
                 "-q:v",
-                "3",
+                "2",
                 str(out_jpg_path),
             ],
             capture_output=True,
@@ -145,29 +149,48 @@ class VideoEngine:
         out_raw_path: Path,
         work_dir: Path,
     ) -> Path:
-        """Download ONLY the selected 30-60s clip section via yt-dlp."""
+        """Download clip from YouTube (section) or TikTok trending URL via yt-dlp."""
         if self.settings.dry_run:
             return self._generate_placeholder_clip(out_raw_path, max(3.0, end_sec - start_sec))
 
-        section = f"*{max(0.0, start_sec):.2f}-{max(start_sec + 5.0, end_sec):.2f}"
         ffmpeg_location = str(Path(self.settings.resolve_ffmpeg_bin()).parent)
-        cmd = [
-            sys.executable,
-            "-m",
-            "yt_dlp",
-            "--no-playlist",
-            "--ffmpeg-location",
-            ffmpeg_location,
-            "--download-sections",
-            section,
-            "-f",
-            "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best",
-            "--merge-output-format",
-            "mp4",
-            "-o",
-            str(out_raw_path),
-            source_url,
-        ]
+        is_tiktok = "tiktok.com" in source_url.lower()
+
+        if is_tiktok:
+            cmd = [
+                sys.executable,
+                "-m",
+                "yt_dlp",
+                "--no-playlist",
+                "--ffmpeg-location",
+                ffmpeg_location,
+                "-f",
+                "best[ext=mp4]/best",
+                "--merge-output-format",
+                "mp4",
+                "-o",
+                str(out_raw_path),
+                source_url,
+            ]
+        else:
+            section = f"*{max(0.0, start_sec):.2f}-{max(start_sec + 5.0, end_sec):.2f}"
+            cmd = [
+                sys.executable,
+                "-m",
+                "yt_dlp",
+                "--no-playlist",
+                "--ffmpeg-location",
+                ffmpeg_location,
+                "--download-sections",
+                section,
+                "-f",
+                "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best",
+                "--merge-output-format",
+                "mp4",
+                "-o",
+                str(out_raw_path),
+                source_url,
+            ]
         proc = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True, check=False, timeout=210)
         if not out_raw_path.exists():
             matches = sorted(work_dir.glob(f"{out_raw_path.stem}*"))
