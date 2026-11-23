@@ -48,13 +48,13 @@ Title: TikTok Auto-Pilot Subtitles
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
-WrapStyle: 2
+WrapStyle: 0
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,DejaVu Sans,68,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,5,2,2,60,60,420,1
-Style: TitleBanner,DejaVu Sans,58,&H0000FFFF,&H00FFFFFF,&H00000000,&HCC101010,1,0,0,0,100,100,0,0,3,16,0,8,70,70,190,1
+Style: Caption,DejaVu Sans,60,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,5,2,2,80,80,380,1
+Style: TitleBanner,DejaVu Sans,46,&H0000FFFF,&H00FFFFFF,&H00000000,&HCC101010,1,0,0,0,100,100,0,0,3,14,0,8,90,90,200,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
