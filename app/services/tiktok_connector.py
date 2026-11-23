@@ -340,9 +340,16 @@ class TikTokConnector:
         ):
             init_body["post_info"]["privacy_level"] = "SELF_ONLY"
             init_resp = client.post(endpoint, headers=headers, json=init_body)
+            outcome = self._interpret_publish_response(init_resp, access_token)
 
-        if init_resp.status_code != 200:
-            return self._interpret_publish_response(init_resp, access_token)
+        # If Direct Post still fails on Sandbox restrictions, fallback to Inbox Draft upload
+        if outcome.outcome == "permanent" and endpoint == TIKTOK_DIRECT_INIT_URL:
+            inbox_body = {"source_info": init_body["source_info"]}
+            init_resp = client.post(TIKTOK_INBOX_INIT_URL, headers=headers, json=inbox_body)
+            outcome = self._interpret_publish_response(init_resp, access_token)
+
+        if outcome.outcome != "published":
+            return outcome
 
         payload = init_resp.json()
         err_code = str((payload.get("error") or {}).get("code") or "ok")
@@ -374,20 +381,21 @@ class TikTokConnector:
 
     def _interpret_publish_response(self, resp: httpx.Response, access_token: str) -> PublishOutcome:
         status = resp.status_code
-        if status in (401, 403):
-            return PublishOutcome(
-                outcome="needs_reconnect",
-                error=self._redact(f"TikTok auth rejected ({status})", access_token),
-            )
         if status == 429 or status >= 500:
             return PublishOutcome(
                 outcome="retryable",
                 error=self._redact(f"TikTok transient HTTP {status}", access_token),
             )
 
+        payload: dict[str, Any] = {}
         try:
             payload = resp.json()
         except Exception:
+            if status in (401, 403):
+                return PublishOutcome(
+                    outcome="needs_reconnect",
+                    error=self._redact(f"TikTok auth rejected ({status})", access_token),
+                )
             return PublishOutcome(
                 outcome="permanent" if 400 <= status < 500 else "reconciling",
                 error=self._redact(f"Non-JSON TikTok response HTTP {status}", access_token),
@@ -395,15 +403,24 @@ class TikTokConnector:
 
         err_obj = payload.get("error") or {}
         err_code = str(err_obj.get("code") or "ok")
-        if err_code in ("access_token_invalid", "scope_not_authorized"):
+        err_msg = str(err_obj.get("message") or err_code)
+
+        if status == 401 or err_code in ("access_token_invalid", "scope_not_authorized", "token_expired"):
             return PublishOutcome(
                 outcome="needs_reconnect",
-                error=self._redact(f"TikTok OAuth error: {err_code}", access_token),
+                error=self._redact(f"TikTok OAuth error ({status}): {err_code} - {err_msg}", access_token),
             )
         if err_code not in ("ok", ""):
             outcome = "retryable" if err_code == "rate_limit_exceeded" else "permanent"
-            msg = str(err_obj.get("message") or err_code)
-            return PublishOutcome(outcome=outcome, error=self._redact(msg, access_token))
+            return PublishOutcome(
+                outcome=outcome,
+                error=self._redact(f"{err_code}: {err_msg}", access_token),
+            )
+        if status == 403:
+            return PublishOutcome(
+                outcome="needs_reconnect",
+                error=self._redact(f"TikTok auth rejected (403)", access_token),
+            )
 
         publish_id = str((payload.get("data") or {}).get("publish_id") or "")
         if not publish_id:

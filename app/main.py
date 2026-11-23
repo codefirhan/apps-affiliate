@@ -433,6 +433,30 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
             )
         return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
 
+    @application.post("/jobs/{job_id}/publish-now")
+    async def publish_job_now(job_id: int):
+        from app.services.scheduler import dispatch_publish_job
+
+        with db_session(settings.database_path) as conn:
+            job = conn.execute("SELECT * FROM content_jobs WHERE id = ?", (job_id,)).fetchone()
+            if not job:
+                raise HTTPException(status_code=404, detail="Job not found")
+            now_iso = utc_now_iso()
+            conn.execute(
+                "UPDATE tiktok_accounts SET status = 'connected', updated_at_utc = ? WHERE id = ?",
+                (now_iso, job["account_id"]),
+            )
+            conn.execute(
+                """
+                UPDATE content_jobs
+                SET status = 'queued', scheduled_at_utc = ?, last_error = '', updated_at_utc = ?
+                WHERE id = ?
+                """,
+                (now_iso, now_iso, job_id),
+            )
+        dispatch_publish_job(job_id, db_path=settings.database_path, settings=settings)
+        return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
+
     @application.post("/jobs/{job_id}/cancel")
     async def cancel_job(job_id: int):
         with db_session(settings.database_path) as conn:

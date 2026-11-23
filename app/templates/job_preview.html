@@ -46,6 +46,12 @@
         </div>
       </form>
 
+      {% if job.r2_video_url and job.status != 'published' %}
+      <form method="post" action="/jobs/{{ job.id }}/publish-now" class="mt-3">
+        <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">Upload ke TikTok Sekarang</button>
+      </form>
+      {% endif %}
+
       {% if job.status in ('pending_research', 'scheduled', 'retry_wait', 'queued') %}
       <form method="post" action="/jobs/{{ job.id }}/cancel" class="mt-3">
         <button type="submit" class="rounded-lg border border-rose-500/40 px-4 py-2 text-sm text-rose-300 hover:bg-rose-500/10">Batalkan Jadwal &amp; Hapus Video R2</button>
