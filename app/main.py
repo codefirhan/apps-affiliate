@@ -451,6 +451,26 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
                 CloudflareR2Service(settings).delete_object(job["r2_object_key"])
         return RedirectResponse(url=f"/jobs/{job_id}", status_code=303)
 
+    @application.get("/terms", response_class=HTMLResponse)
+    async def terms_page():
+        return HTMLResponse(
+            "<html><head><title>Terms of Service - TikTok Auto-Pilot Bot</title></head>"
+            "<body style='font-family:sans-serif;max-width:720px;margin:40px auto;padding:0 16px'>"
+            "<h1>Terms of Service</h1>"
+            "<p>This application automates content creation and scheduled publishing for authorized TikTok accounts via the official TikTok Content Posting API.</p>"
+            "</body></html>"
+        )
+
+    @application.get("/privacy", response_class=HTMLResponse)
+    async def privacy_page():
+        return HTMLResponse(
+            "<html><head><title>Privacy Policy - TikTok Auto-Pilot Bot</title></head>"
+            "<body style='font-family:sans-serif;max-width:720px;margin:40px auto;padding:0 16px'>"
+            "<h1>Privacy Policy</h1>"
+            "<p>OAuth tokens are encrypted at rest and used solely to publish user-scheduled videos to their connected TikTok account. Temporary media files are deleted after processing.</p>"
+            "</body></html>"
+        )
+
     @application.get("/health")
     async def health():
         with db_session(settings.database_path) as conn:

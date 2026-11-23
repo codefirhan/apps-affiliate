@@ -247,10 +247,24 @@ class TikTokConnector:
         }
 
         own_client = http_client is None
-        client = http_client or httpx.Client(timeout=25.0)
+        client = http_client or httpx.Client(timeout=35.0)
         try:
             resp = client.post(endpoint, headers=headers, json=body)
-            return self._interpret_publish_response(resp, access_token)
+            outcome = self._interpret_publish_response(resp, access_token)
+            if (
+                outcome.outcome == "permanent"
+                and "url_ownership_unverified" in outcome.error
+                and http_client is None
+            ):
+                return self._publish_via_file_upload(
+                    client=client,
+                    endpoint=endpoint,
+                    headers=headers,
+                    post_info=body.get("post_info"),
+                    video_url=video_url,
+                    access_token=access_token,
+                )
+            return outcome
         except httpx.TimeoutException as exc:
             # Ambiguous failure after sending request: MUST reconcile instead of blind retry.
             return PublishOutcome(
@@ -265,6 +279,66 @@ class TikTokConnector:
         finally:
             if own_client:
                 client.close()
+
+    def _publish_via_file_upload(
+        self,
+        client: httpx.Client,
+        endpoint: str,
+        headers: dict[str, str],
+        post_info: dict[str, Any] | None,
+        video_url: str,
+        access_token: str,
+    ) -> PublishOutcome:
+        """Fallback to TikTok FILE_UPLOAD by streaming MP4 bytes from R2 in memory."""
+        media_resp = client.get(video_url, timeout=45.0)
+        media_resp.raise_for_status()
+        video_bytes = media_resp.content
+        size = len(video_bytes)
+        if size == 0:
+            return PublishOutcome(outcome="permanent", error="R2 video is empty (0 bytes)")
+
+        init_body: dict[str, Any] = {
+            "source_info": {
+                "source": "FILE_UPLOAD",
+                "video_size": size,
+                "chunk_size": size,
+                "total_chunk_count": 1,
+            }
+        }
+        if post_info:
+            init_body["post_info"] = post_info
+
+        init_resp = client.post(endpoint, headers=headers, json=init_body)
+        if init_resp.status_code != 200:
+            return self._interpret_publish_response(init_resp, access_token)
+
+        payload = init_resp.json()
+        err_code = str((payload.get("error") or {}).get("code") or "ok")
+        if err_code not in ("ok", ""):
+            return self._interpret_publish_response(init_resp, access_token)
+
+        data = payload.get("data") or {}
+        publish_id = str(data.get("publish_id") or "")
+        upload_url = str(data.get("upload_url") or "")
+        if not publish_id or not upload_url:
+            return PublishOutcome(outcome="permanent", error="TikTok FILE_UPLOAD missing upload_url")
+
+        put_resp = client.put(
+            upload_url,
+            headers={
+                "Content-Type": "video/mp4",
+                "Content-Length": str(size),
+                "Content-Range": f"bytes 0-{size - 1}/{size}",
+            },
+            content=video_bytes,
+            timeout=90.0,
+        )
+        if put_resp.status_code not in (200, 201, 206):
+            return PublishOutcome(
+                outcome="retryable" if put_resp.status_code >= 500 else "permanent",
+                error=self._redact(f"TikTok chunk PUT HTTP {put_resp.status_code}", access_token),
+            )
+        return PublishOutcome(outcome="published", publish_id=publish_id)
 
     def _interpret_publish_response(self, resp: httpx.Response, access_token: str) -> PublishOutcome:
         status = resp.status_code
