@@ -236,14 +236,13 @@ class AIService:
         try:
             with audio_path.open("rb") as fh, httpx.Client(timeout=90.0) as client:
                 files = {"file": (audio_path.name, fh, "audio/mpeg")}
-                data: list[tuple[str, str]] = [
-                    ("model", model),
-                    ("response_format", "verbose_json"),
-                    ("timestamp_granularities[]", "word"),
-                    ("timestamp_granularities[]", "segment"),
-                ]
+                data: dict[str, str] = {
+                    "model": model,
+                    "response_format": "verbose_json",
+                    "timestamp_granularities[]": "word",
+                }
                 if language:
-                    data.append(("language", language))
+                    data["language"] = language
                 resp = client.post(
                     endpoint,
                     headers={"Authorization": f"Bearer {api_key}"},
