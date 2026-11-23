@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+  <h2 class="text-base font-semibold text-white">Hubungkan Akun TikTok Baru (OAuth 2.0 PKCE)</h2>
+  <p class="mt-1 text-xs text-slate-400">
+    Token disimpan terenkripsi (Fernet). Pilih <strong>Draft / Inbox Only</strong> sebelum TikTok App Audit disetujui, atau <strong>Direct Post</strong> setelah lolos audit.
+  </p>
+  <form method="get" action="/auth/tiktok/start" class="mt-4 flex flex-wrap items-end gap-3">
+    <div>
+      <label class="block text-xs text-slate-400">Label Akun</label>
+      <input type="text" name="display_name" required placeholder="Contoh: Akun Edukasi ID" class="mt-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Mode Publish</label>
+      <select name="publish_mode" class="mt-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+        <option value="draft_only">Draft / Inbox Only (Pre-Audit)</option>
+        <option value="direct_post">Direct Post (Post-Audit)</option>
+      </select>
+    </div>
+    <button type="submit" class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500">Hubungkan via TikTok OAuth</button>
+  </form>
+</div>
+
+<div class="mt-6 grid gap-4 md:grid-cols-2">
+  {% for acc in accounts %}
+  <div class="rounded-xl border border-slate-800 bg-slate-900 p-4">
+    <div class="flex items-start justify-between">
+      <div>
+        <h3 class="font-semibold text-white">{{ acc.display_name }}</h3>
+        <p class="font-mono text-xs text-slate-400">open_id: {{ acc.open_id }}</p>
+      </div>
+      <span class="rounded-full px-2.5 py-0.5 text-xs font-medium {{ 'bg-emerald-500/15 text-emerald-300' if acc.status == 'connected' else 'bg-amber-500/15 text-amber-300' }}">
+        {{ acc.status }}
+      </span>
+    </div>
+    <div class="mt-3 rounded-lg bg-slate-950 p-3 text-xs text-slate-300">
+      <div>Mode Kapabilitas: <strong class="text-white">{{ acc.capability.label }}</strong></div>
+      <div class="mt-1 text-slate-400">Scopes: {{ acc.scopes or ', '.join(acc.capability.scopes) }}</div>
+    </div>
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <form method="post" action="/accounts/{{ acc.id }}/mode" class="flex items-center gap-2">
+        <input type="hidden" name="publish_mode" value="{{ 'direct_post' if acc.publish_mode == 'draft_only' else 'draft_only' }}" />
+        <button type="submit" class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800">
+          Ubah ke {{ 'Direct Post' if acc.publish_mode == 'draft_only' else 'Draft Only' }}
+        </button>
+      </form>
+      <form method="post" action="/accounts/{{ acc.id }}/delete">
+        <button type="submit" class="rounded-lg border border-rose-500/40 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/10">Hapus</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-400">
+    Belum ada akun TikTok terhubung.
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

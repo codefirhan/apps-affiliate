@@ -1,0 +1,44 @@
+<div class="overflow-x-auto">
+  <table class="w-full text-left text-sm">
+    <thead class="border-b border-slate-800 text-xs uppercase text-slate-400">
+      <tr>
+        <th class="px-4 py-3">ID</th>
+        <th class="px-4 py-3">Akun / Mode</th>
+        <th class="px-4 py-3">Judul Overlay</th>
+        <th class="px-4 py-3">Jadwal (WIB)</th>
+        <th class="px-4 py-3">Status</th>
+        <th class="px-4 py-3">Aksi</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-800/80">
+      {% for job in jobs %}
+      <tr class="hover:bg-slate-800/30">
+        <td class="px-4 py-3 font-mono text-xs text-slate-400">#{{ job.id }}</td>
+        <td class="px-4 py-3">
+          <div class="font-medium text-white">{{ job.account_name or '-' }}</div>
+          <div class="text-xs text-slate-400">{{ job.mode }} · {{ job.account_publish_mode or 'draft_only' }}</div>
+        </td>
+        <td class="px-4 py-3 max-w-xs truncate text-slate-200">{{ job.title_overlay or '(menunggu riset AI)' }}</td>
+        <td class="px-4 py-3 text-xs text-slate-300">{{ to_jakarta(job.scheduled_at_utc) }} WIB</td>
+        <td class="px-4 py-3">
+          <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium
+            {% if job.status == 'published' %}bg-emerald-500/15 text-emerald-300
+            {% elif job.status in ('scheduled', 'queued') %}bg-sky-500/15 text-sky-300
+            {% elif job.status in ('pending_research', 'rendering', 'publishing') %}bg-indigo-500/15 text-indigo-300
+            {% elif job.status in ('reconciling', 'retry_wait', 'needs_reconnect') %}bg-amber-500/15 text-amber-300
+            {% else %}bg-rose-500/15 text-rose-300{% endif %}">
+            {{ job.status }}
+          </span>
+        </td>
+        <td class="px-4 py-3">
+          <a href="/jobs/{{ job.id }}" class="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800">Preview / Edit</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500">Belum ada job konten.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

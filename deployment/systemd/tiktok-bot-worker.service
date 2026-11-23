@@ -1,0 +1,23 @@
+[Unit]
+Description=TikTok Auto-Pilot Bot Serial Worker & Telegram Bot
+After=network-online.target tiktok-bot-web.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tiktokbot
+Group=tiktokbot
+WorkingDirectory=/opt/tiktok-bot/current
+EnvironmentFile=/etc/tiktok-bot/app.env
+ExecStart=/opt/tiktok-bot/current/.venv/bin/python -m app.worker
+Restart=always
+RestartSec=5
+MemoryMax=1200M
+CPUQuota=180%
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/tiktok-bot/shared/data /tmp/tiktok-bot
+
+[Install]
+WantedBy=multi-user.target

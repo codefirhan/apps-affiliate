@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ settings.app_name }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="min-h-full bg-slate-950 text-slate-100 antialiased">
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3.5">
+      <div class="flex items-center gap-3">
+        <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/20 text-sm font-bold text-rose-400">TT</span>
+        <div>
+          <h1 class="text-sm font-semibold tracking-tight text-white">{{ settings.app_name }}</h1>
+          <p class="text-xs text-slate-400">YouTube Clipper + Faceless AI · Zero Local Storage</p>
+        </div>
+      </div>
+
+      <nav class="flex items-center gap-2 text-sm">
+        <a href="/" class="rounded-lg px-3 py-1.5 {{ 'bg-slate-800 text-white font-medium' if active_tab == 'dashboard' else 'text-slate-300 hover:bg-slate-800/60' }}">Dashboard</a>
+        <a href="/accounts" class="rounded-lg px-3 py-1.5 {{ 'bg-slate-800 text-white font-medium' if active_tab == 'accounts' else 'text-slate-300 hover:bg-slate-800/60' }}">Akun TikTok</a>
+        <a href="/campaigns" class="rounded-lg px-3 py-1.5 {{ 'bg-slate-800 text-white font-medium' if active_tab == 'campaigns' else 'text-slate-300 hover:bg-slate-800/60' }}">Campaigns</a>
+        {% if settings.dry_run %}
+        <span class="ml-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-300">DRY_RUN</span>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

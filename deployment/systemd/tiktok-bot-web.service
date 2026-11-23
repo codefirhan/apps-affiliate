@@ -1,0 +1,22 @@
+[Unit]
+Description=TikTok Auto-Pilot Bot Web Dashboard (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tiktokbot
+Group=tiktokbot
+WorkingDirectory=/opt/tiktok-bot/current
+EnvironmentFile=/etc/tiktok-bot/app.env
+ExecStart=/opt/tiktok-bot/current/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=5
+MemoryMax=320M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/tiktok-bot/shared/data /tmp/tiktok-bot
+
+[Install]
+WantedBy=multi-user.target

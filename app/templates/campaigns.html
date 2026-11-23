@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="rounded-xl border border-slate-800 bg-slate-900 p-5">
+  <h2 class="text-base font-semibold text-white">Buat Campaign Auto-Pilot</h2>
+  <form method="post" action="/campaigns" class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div>
+      <label class="block text-xs text-slate-400">Akun TikTok Target</label>
+      <select name="account_id" required class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+        {% for acc in accounts %}
+        <option value="{{ acc.id }}">{{ acc.display_name }} ({{ acc.publish_mode }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Nama Campaign</label>
+      <input type="text" name="name" required placeholder="Misal: Klip Podcast Bisnis ID" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Mode Pipeline</label>
+      <select name="mode" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+        <option value="youtube_clipper">YouTube Viral Clipper (9:16 + Subtitle/Dub)</option>
+        <option value="faceless_ai">Faceless AI Video (Riset + Stock + Dub)</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Niche / Topik</label>
+      <input type="text" name="niche" required placeholder="Contoh: teknologi ai / keuangan" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Keywords Pencarian</label>
+      <input type="text" name="keywords" placeholder="podcast startup indonesia" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Slot Jam Posting (WIB, pisah koma)</label>
+      <input type="text" name="schedule_slots" value="12:00,19:00" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" />
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Bahasa Sumber / Utama</label>
+      <select name="language" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+        <option value="id">Indonesia (id)</option>
+        <option value="en">English (en)</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Auto-Translate &amp; Dubbing Ke</label>
+      <select name="translate_to_language" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+        <option value="">Tidak Perlu Translate (Asli)</option>
+        <option value="id">Indonesia (Dub ID)</option>
+        <option value="en">English (Dub EN)</option>
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs text-slate-400">Suara TTS (Edge-TTS)</label>
+      <select name="tts_voice" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white">
+        <option value="id-ID-ArdiNeural">id-ID-ArdiNeural (Pria ID)</option>
+        <option value="id-ID-GadisNeural">id-ID-GadisNeural (Wanita ID)</option>
+        <option value="en-US-AndrewNeural">en-US-AndrewNeural (Male EN)</option>
+        <option value="en-US-AriaNeural">en-US-AriaNeural (Female EN)</option>
+      </select>
+    </div>
+    <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-3">
+      <input type="checkbox" name="auto_pilot" value="1" checked id="ap-check" class="rounded border-slate-700 bg-slate-950" />
+      <label for="ap-check" class="text-sm text-slate-200">Aktifkan Full Auto-Pilot (riset, render, &amp; jadwalkan otomatis tiap hari)</label>
+      <button type="submit" class="ml-auto rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500">Simpan Campaign</button>
+    </div>
+  </form>
+</div>
+
+<div class="mt-6 space-y-3">
+  {% for camp in campaigns %}
+  <div class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-800 bg-slate-900 p-4">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-xs text-slate-500">#{{ camp.id }}</span>
+        <h3 class="font-semibold text-white">{{ camp.name }}</h3>
+        <span class="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-300">{{ camp.mode }}</span>
+        <span class="rounded px-2 py-0.5 text-xs {{ 'bg-emerald-500/15 text-emerald-300' if camp.is_active else 'bg-slate-800 text-slate-400' }}">{{ 'Aktif' if camp.is_active else 'Nonaktif' }}</span>
+      </div>
+      <p class="mt-1 text-xs text-slate-400">
+        Akun: {{ camp.account_name or '-' }} · Niche: {{ camp.niche }} · Bahasa: {{ camp.language }}{% if camp.translate_to_language %} → {{ camp.translate_to_language }}{% endif %} · Jadwal WIB: {{ camp.schedule_times_jakarta }}
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <form method="post" action="/campaigns/{{ camp.id }}/run-now">
+        <button type="submit" class="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500">Run Now</button>
+      </form>
+      <form method="post" action="/campaigns/{{ camp.id }}/toggle">
+        <button type="submit" class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800">{{ 'Pause' if camp.is_active else 'Aktifkan' }}</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-400">Belum ada campaign.</div>
+  {% endfor %}
+</div>
+{% endblock %}

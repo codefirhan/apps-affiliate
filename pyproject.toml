@@ -1,0 +1,10 @@
+[project]
+name = "tiktok-autopilot-bot"
+version = "0.1.0"
+description = "Dual-mode TikTok Auto-Pilot Content Bot (YouTube Clipper & Faceless AI) with zero persistent local media storage."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["."]

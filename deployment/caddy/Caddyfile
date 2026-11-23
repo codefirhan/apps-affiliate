@@ -1,0 +1,23 @@
+{$BOT_DOMAIN:bot.example.com} {
+	encode gzip
+
+	# Block hidden dotfiles (.env, .git, etc.)
+	@hidden path_regexp ^/\.
+	respond @hidden 404
+
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	request_body {
+		max_size 10MB
+	}
+
+	reverse_proxy 127.0.0.1:8000 {
+		health_uri /health
+		health_interval 30s
+	}
+}
