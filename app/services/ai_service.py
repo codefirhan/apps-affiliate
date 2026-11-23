@@ -146,12 +146,16 @@ class AIService:
         if end_sec - start_sec > 60.0:
             end_sec = start_sec + 55.0
 
+        raw_tags = result.get("hashtags") or "#fyp #tiktok #viral"
+        if isinstance(raw_tags, list):
+            raw_tags = " ".join(str(t) for t in raw_tags)
+
         return {
             "start_sec": round(start_sec, 2),
             "end_sec": round(end_sec, 2),
             "title_overlay": str(result.get("title_overlay") or video_title[:42] or "Fakta Menarik!"),
             "caption": str(result.get("caption") or f"Highlight seputar {niche}"),
-            "hashtags": str(result.get("hashtags") or "#fyp #tiktok #viral"),
+            "hashtags": str(raw_tags),
             "translated_script": str(result.get("translated_script") or ""),
         }
 
@@ -182,6 +186,10 @@ class AIService:
         if isinstance(queries, str):
             queries = [q.strip() for q in queries.split(",") if q.strip()]
 
+        raw_tags = result.get("hashtags") or "#fyp #edukasi #viral"
+        if isinstance(raw_tags, list):
+            raw_tags = " ".join(str(t) for t in raw_tags)
+
         return {
             "topic": str(result.get("topic") or niche),
             "hook": str(result.get("hook") or ""),
@@ -189,7 +197,7 @@ class AIService:
             "script": str(result.get("script") or ""),
             "visual_queries": [str(q) for q in queries[:4]],
             "caption": str(result.get("caption") or f"Tips {niche} wajib tahu!"),
-            "hashtags": str(result.get("hashtags") or "#fyp #edukasi #viral"),
+            "hashtags": str(raw_tags),
         }
 
     def transcribe_audio(self, audio_path: Path, language: str = "id") -> list[dict[str, Any]]:
