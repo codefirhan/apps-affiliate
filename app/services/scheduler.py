@@ -230,29 +230,53 @@ def process_render_job(
             if mode == "youtube_clipper":
                 source_url = str(job.get("source_url") or "").strip()
                 video_title = ""
-                if not source_url:
-                    candidates = research.search_viral_youtube(niche, keywords, max_results=5)
-                    if not candidates:
-                        raise RuntimeError("No YouTube viral candidate videos found")
-                    source_url = candidates[0]["url"]
-                    video_title = candidates[0].get("title", "")
-
-                transcript = research.fetch_youtube_transcript(source_url, language, work_dir)
-                clip_plan = ai_service.select_viral_clip(
-                    transcript_segments=transcript,
-                    niche=niche,
-                    language=language,
-                    translate_to=translate_to,
-                    video_title=video_title,
-                )
+                video_duration = 0
                 raw_clip = work_dir / "raw_yt_section.mp4"
-                video_engine.download_youtube_section(
-                    source_url=source_url,
-                    start_sec=float(clip_plan["start_sec"]),
-                    end_sec=float(clip_plan["end_sec"]),
-                    out_raw_path=raw_clip,
-                    work_dir=work_dir,
-                )
+
+                if source_url:
+                    candidates = [{"url": source_url, "title": "", "duration": 0}]
+                else:
+                    kw_parts = [k.strip() for k in keywords.split(",") if k.strip()]
+                    chosen_kw = kw_parts[job_id % len(kw_parts)] if kw_parts else keywords
+                    found = research.search_viral_youtube(niche, chosen_kw, max_results=6)
+                    if not found:
+                        raise RuntimeError(f"No YouTube viral candidate videos found for {niche} {chosen_kw}")
+                    shift = job_id % len(found)
+                    candidates = found[shift:] + found[:shift]
+
+                last_dl_err: Exception | None = None
+                clip_plan: dict[str, Any] = {}
+                for cand in candidates[:3]:
+                    cand_url = cand["url"]
+                    video_title = cand.get("title", "")
+                    video_duration = int(cand.get("duration") or 0)
+                    transcript = research.fetch_youtube_transcript(cand_url, language, work_dir)
+                    clip_plan = ai_service.select_viral_clip(
+                        transcript_segments=transcript,
+                        niche=niche,
+                        language=language,
+                        translate_to=translate_to,
+                        video_title=video_title,
+                        video_duration=video_duration,
+                    )
+                    try:
+                        video_engine.download_youtube_section(
+                            source_url=cand_url,
+                            start_sec=float(clip_plan["start_sec"]),
+                            end_sec=float(clip_plan["end_sec"]),
+                            out_raw_path=raw_clip,
+                            work_dir=work_dir,
+                        )
+                        source_url = cand_url
+                        last_dl_err = None
+                        break
+                    except Exception as dl_exc:
+                        last_dl_err = dl_exc
+                        raw_clip.unlink(missing_ok=True)
+                        continue
+
+                if last_dl_err is not None:
+                    raise last_dl_err
 
                 dub_audio_path: Path | None = None
                 target_lang = translate_to or language

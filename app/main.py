@@ -334,6 +334,20 @@ def create_app(settings_override: Settings | None = None) -> FastAPI:
             )
         return RedirectResponse(url="/campaigns", status_code=303)
 
+    @application.post("/campaigns/{campaign_id}/delete")
+    async def delete_campaign(campaign_id: int):
+        with db_session(settings.database_path) as conn:
+            conn.execute(
+                """
+                UPDATE content_jobs
+                SET status = 'cancelled', updated_at_utc = ?
+                WHERE campaign_id = ? AND status IN ('pending_research', 'scheduled', 'retry_wait', 'queued')
+                """,
+                (utc_now_iso(), campaign_id),
+            )
+            conn.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
+        return RedirectResponse(url="/campaigns", status_code=303)
+
     @application.post("/campaigns/{campaign_id}/run-now")
     async def run_campaign_now(campaign_id: int, source_url: str = Form("")):
         with db_session(settings.database_path) as conn:

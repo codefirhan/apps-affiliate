@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -148,24 +149,33 @@ class VideoEngine:
         if self.settings.dry_run:
             return self._generate_placeholder_clip(out_raw_path, max(3.0, end_sec - start_sec))
 
-        section = f"*{max(0.0, start_sec):.2f}-{max(start_sec + 1.0, end_sec):.2f}"
+        section = f"*{max(0.0, start_sec):.2f}-{max(start_sec + 5.0, end_sec):.2f}"
+        ffmpeg_location = str(Path(self.settings.resolve_ffmpeg_bin()).parent)
         cmd = [
-            "yt-dlp",
+            sys.executable,
+            "-m",
+            "yt_dlp",
             "--no-playlist",
+            "--ffmpeg-location",
+            ffmpeg_location,
             "--download-sections",
             section,
-            "--force-keyframes-at-cuts",
             "-f",
-            "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best[height<=1080]",
+            "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best",
             "--merge-output-format",
             "mp4",
             "-o",
             str(out_raw_path),
             source_url,
         ]
-        subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True, check=True, timeout=180)
+        proc = subprocess.run(cmd, cwd=str(work_dir), capture_output=True, text=True, check=False, timeout=210)
         if not out_raw_path.exists():
-            raise FileNotFoundError("yt-dlp finished without producing output clip")
+            matches = sorted(work_dir.glob(f"{out_raw_path.stem}*"))
+            if matches:
+                matches[0].rename(out_raw_path)
+        if not out_raw_path.exists():
+            stderr_tail = (proc.stderr or proc.stdout or "")[-400:]
+            raise FileNotFoundError(f"yt-dlp failed producing clip: {stderr_tail}")
         return out_raw_path
 
     def render_youtube_clip(
@@ -176,10 +186,15 @@ class VideoEngine:
         work_dir: Path,
         dub_audio_path: Path | None = None,
     ) -> Path:
-        """Reframe clip to 9:16 1080x1920, optionally swap/mix dubbing audio, and burn .ass."""
+        """Reframe clip to 9:16 1080x1920 with blurred backdrop + full centered frame and .ass subtitles."""
         ffmpeg = self.settings.resolve_ffmpeg_bin()
         ass_rel = ass_path.name
-        vf = f"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,ass={ass_rel}"
+        vf = (
+            "[0:v]split=2[bg][fg];"
+            "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=16:4[bgblur];"
+            "[fg]scale=1080:1920:force_original_aspect_ratio=decrease[fgscale];"
+            f"[bgblur][fgscale]overlay=(W-w)/2:(H-h)/2,ass={ass_rel}[vout]"
+        )
 
         if dub_audio_path and dub_audio_path.exists():
             cmd = [
@@ -189,10 +204,10 @@ class VideoEngine:
                 str(raw_clip_path),
                 "-i",
                 str(dub_audio_path),
-                "-vf",
+                "-filter_complex",
                 vf,
                 "-map",
-                "0:v:0",
+                "[vout]",
                 "-map",
                 "1:a:0",
                 "-c:v",
@@ -222,8 +237,12 @@ class VideoEngine:
                 "-y",
                 "-i",
                 str(raw_clip_path),
-                "-vf",
+                "-filter_complex",
                 vf,
+                "-map",
+                "[vout]",
+                "-map",
+                "0:a:0?",
                 "-c:v",
                 "libx264",
                 "-preset",

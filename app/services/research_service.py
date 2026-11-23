@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -113,14 +114,16 @@ class ResearchService:
 
         proc = subprocess.run(
             [
-                "yt-dlp",
+                sys.executable,
+                "-m",
+                "yt_dlp",
                 "--dump-json",
                 "--flat-playlist",
-                f"ytsearch{max_results}:{query}",
+                f"ytsearch{max(max_results, 8)}:{query}",
             ],
             capture_output=True,
             text=True,
-            timeout=45,
+            timeout=60,
             check=True,
         )
         candidates: list[dict[str, Any]] = []
@@ -134,7 +137,7 @@ class ResearchService:
                 continue
             vid = entry.get("id", "")
             duration = int(entry.get("duration") or 0)
-            if vid and (duration == 0 or duration <= 3600):
+            if vid and (duration == 0 or (20 <= duration <= 1800)):
                 candidates.append(
                     {
                         "video_id": vid,
@@ -145,7 +148,7 @@ class ResearchService:
                     }
                 )
         candidates.sort(key=lambda item: item.get("view_count", 0), reverse=True)
-        return candidates
+        return candidates[:max_results]
 
     def fetch_youtube_transcript(
         self, video_url: str, language: str, work_dir: Path
@@ -160,12 +163,14 @@ class ResearchService:
         try:
             subprocess.run(
                 [
-                    "yt-dlp",
+                    sys.executable,
+                    "-m",
+                    "yt_dlp",
                     "--skip-download",
                     "--write-sub",
                     "--write-auto-sub",
                     "--sub-lang",
-                    f"{language},en,id",
+                    f"{language},id,en",
                     "--sub-format",
                     "vtt",
                     "-o",

@@ -106,11 +106,12 @@ class AIService:
         language: str = "id",
         translate_to: str | None = None,
         video_title: str = "",
+        video_duration: int = 0,
     ) -> dict[str, Any]:
         """Choose the highest-FYP 25-60s segment from a YouTube transcript."""
         target_lang = (translate_to or language or "id").lower()
         if self.settings.dry_run or not self._has_llm_key():
-            return self._fallback_viral_clip(transcript_segments, niche, target_lang, video_title)
+            return self._fallback_viral_clip(transcript_segments, niche, target_lang, video_title, video_duration)
 
         compact_transcript = [
             {
@@ -121,18 +122,23 @@ class AIService:
             for seg in transcript_segments[:120]
         ]
 
+        default_start = 45.0 if (not compact_transcript and video_duration > 120) else 0.0
         system_prompt = (
-            "You are a TikTok FYP viral editor. Given transcript segments with timestamps, "
-            "pick ONE self-contained high-retention 25 to 55 second segment with a strong hook. "
+            "You are a TikTok FYP viral editor. Given a YouTube video title, duration, and transcript segments "
+            "(if available), pick ONE self-contained high-retention 30 to 50 second segment with the strongest "
+            "comedy punchline or hook (skip opening intros if duration > 120s). "
             "Return strict JSON with keys: start_sec (number), end_sec (number), "
-            "title_overlay (short 4-7 word hook banner), caption (engaging TikTok description), "
-            "hashtags (space-separated #tags), translated_script (natural spoken script in target_lang "
-            "if dubbing/translation is requested, else empty string)."
+            "title_overlay (short 4-7 word punchy hook banner in target_language), "
+            "caption (engaging TikTok caption in target_language), "
+            "hashtags (space-separated #tags), translated_script (natural spoken script in target_language "
+            "if needs_translation_dub is true, else empty string)."
         )
         user_prompt = json.dumps(
             {
                 "niche": niche,
                 "source_title": video_title,
+                "video_duration_sec": video_duration,
+                "default_start_sec_if_no_transcript": default_start,
                 "source_language": language,
                 "target_language": target_lang,
                 "needs_translation_dub": bool(translate_to and translate_to != language),
@@ -141,10 +147,14 @@ class AIService:
             ensure_ascii=False,
         )
         result = self._call_llm_json(system_prompt, user_prompt)
-        start_sec = max(0.0, float(result.get("start_sec", 0.0)))
-        end_sec = max(start_sec + 15.0, float(result.get("end_sec", start_sec + 35.0)))
-        if end_sec - start_sec > 60.0:
-            end_sec = start_sec + 55.0
+        start_sec = max(0.0, float(result.get("start_sec", default_start)))
+        if video_duration > 40 and start_sec > video_duration - 25:
+            start_sec = max(0.0, float(video_duration - 40))
+        end_sec = max(start_sec + 20.0, float(result.get("end_sec", start_sec + 38.0)))
+        if end_sec - start_sec > 55.0:
+            end_sec = start_sec + 45.0
+        if video_duration > 0:
+            end_sec = min(float(video_duration), end_sec)
 
         raw_tags = result.get("hashtags") or "#fyp #tiktok #viral"
         if isinstance(raw_tags, list):
@@ -278,9 +288,10 @@ class AIService:
         niche: str,
         target_lang: str,
         video_title: str,
+        video_duration: int = 0,
     ) -> dict[str, Any]:
-        start_sec = 0.0
-        end_sec = 10.0
+        start_sec = 45.0 if video_duration > 120 else 0.0
+        end_sec = start_sec + 35.0 if video_duration > 120 else 10.0
         if transcript_segments:
             start_sec = max(0.0, float(transcript_segments[0].get("start", 0.0)))
             last_end = float(transcript_segments[-1].get("end", start_sec + 10.0))

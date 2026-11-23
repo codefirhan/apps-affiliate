@@ -87,6 +87,9 @@
       <form method="post" action="/campaigns/{{ camp.id }}/toggle">
         <button type="submit" class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800">{{ 'Pause' if camp.is_active else 'Aktifkan' }}</button>
       </form>
+      <form method="post" action="/campaigns/{{ camp.id }}/delete">
+        <button type="submit" class="rounded-lg border border-rose-500/40 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/10">Hapus</button>
+      </form>
     </div>
   </div>
   {% else %}
