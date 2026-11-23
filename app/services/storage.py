@@ -115,9 +115,26 @@ class CloudflareImagesService:
         )
 
     def upload_image(self, local_path: Path, metadata: dict[str, Any] | None = None) -> dict[str, str]:
-        """Upload an image file to Cloudflare Images and return image_id + public URL."""
+        """Upload an image file to Cloudflare Images (or fallback to R2 when CF Images is unset)."""
         if not local_path.exists():
             raise FileNotFoundError(f"Image file not found: {local_path}")
+
+        if not self.settings.dry_run and not self.is_configured:
+            r2 = CloudflareR2Service(self.settings)
+            if r2.is_configured:
+                thumb_key = f"thumbs/{local_path.name}"
+                base_url = r2.validate_public_base_url()
+                client = r2._client()
+                client.upload_file(
+                    str(local_path),
+                    self.settings.r2_bucket,
+                    thumb_key,
+                    ExtraArgs={"ContentType": "image/jpeg"},
+                )
+                return {
+                    "image_id": f"r2:{thumb_key}",
+                    "url": f"{base_url}/{thumb_key}",
+                }
 
         if self.settings.dry_run or not self.is_configured:
             fake_id = f"mock-img-{local_path.stem}"

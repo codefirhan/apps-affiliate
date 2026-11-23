@@ -2,9 +2,10 @@
 set -euo pipefail
 
 # Create or update dedicated Nginx vhost for socmed.codefirhan.my.id -> 127.0.0.1:8000
-# and provision Let's Encrypt HTTPS certificate via Certbot without touching other vhosts.
+# plus stateless /media/ stream proxy -> Cloudflare R2 public bucket URL (zero VPS disk storage).
 
 DOMAIN="${1:-socmed.codefirhan.my.id}"
+R2_UPSTREAM_HOST="${2:-pub-42c26168576a4616bed693e74d7cfe5d.r2.dev}"
 AVAIL_FILE="/etc/nginx/sites-available/${DOMAIN}"
 ENABLED_FILE="/etc/nginx/sites-enabled/${DOMAIN}"
 
@@ -27,6 +28,17 @@ server {
         return 404;
     }
 
+    location ^~ /media/ {
+        resolver 1.1.1.1 8.8.8.8 valid=300s;
+        proxy_pass https://${R2_UPSTREAM_HOST}/;
+        proxy_ssl_server_name on;
+        proxy_set_header Host ${R2_UPSTREAM_HOST};
+        proxy_buffering off;
+        proxy_max_temp_file_size 0;
+        proxy_hide_header x-amz-id-2;
+        proxy_hide_header x-amz-request-id;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
@@ -44,7 +56,6 @@ ln -sfn "${AVAIL_FILE}" "${ENABLED_FILE}"
 nginx -t
 systemctl reload nginx
 
-# Provision Let's Encrypt SSL certificate for DOMAIN if certbot is available or installable.
 if ! command -v certbot >/dev/null 2>&1; then
   apt-get update
   apt-get install -y --no-install-recommends certbot python3-certbot-nginx
@@ -54,4 +65,4 @@ certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --register-unsafely
 
 nginx -t
 systemctl reload nginx
-echo "Nginx + SSL configured for https://${DOMAIN} -> http://127.0.0.1:8000"
+echo "Nginx + SSL + /media/ R2 proxy configured for https://${DOMAIN}"

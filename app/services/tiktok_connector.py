@@ -202,7 +202,7 @@ class TikTokConnector:
         if not video_url.startswith("https://"):
             return PublishOutcome(outcome="permanent", error="Invalid or missing HTTPS R2 video URL")
 
-        if self.settings.dry_run and http_client is None:
+        if (self.settings.dry_run or not self.settings.tiktok_client_key) and http_client is None:
             return PublishOutcome(
                 outcome="published",
                 publish_id=f"dryrun_pub_{job.get('id', '0')}",
