@@ -51,26 +51,47 @@ class AIService:
                     return json.loads(content)
 
             if self.settings.gemini_api_key:
-                url = (
-                    f"https://generativelanguage.googleapis.com/v1beta/models/"
-                    f"{self.settings.gemini_model}:generateContent"
-                )
-                with httpx.Client(timeout=45.0) as client:
-                    resp = client.post(
-                        url,
-                        params={"key": self.settings.gemini_api_key},
-                        json={
-                            "systemInstruction": {"parts": [{"text": system_prompt}]},
-                            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
-                            "generationConfig": {
-                                "responseMimeType": "application/json",
-                                "temperature": 0.7,
-                            },
-                        },
+                models_to_try = list(
+                    dict.fromkeys(
+                        [
+                            self.settings.gemini_model,
+                            "gemini-flash-lite-latest",
+                            "gemini-3.8-flash",
+                            "gemini-3.7-flash",
+                            "gemini-3.5-flash",
+                        ]
                     )
-                    resp.raise_for_status()
-                    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    return json.loads(text)
+                )
+                last_err: Exception | None = None
+                with httpx.Client(timeout=45.0) as client:
+                    for model_name in models_to_try:
+                        url = (
+                            f"https://generativelanguage.googleapis.com/v1beta/models/"
+                            f"{model_name}:generateContent"
+                        )
+                        resp = client.post(
+                            url,
+                            headers={
+                                "x-goog-api-key": self.settings.gemini_api_key,
+                                "Content-Type": "application/json",
+                            },
+                            json={
+                                "systemInstruction": {"parts": [{"text": system_prompt}]},
+                                "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+                                "generationConfig": {
+                                    "responseMimeType": "application/json",
+                                    "temperature": 0.7,
+                                },
+                            },
+                        )
+                        if resp.status_code in (404, 429, 503):
+                            last_err = RuntimeError(f"Model {model_name} HTTP {resp.status_code}")
+                            continue
+                        resp.raise_for_status()
+                        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+                        return json.loads(text)
+                if last_err is not None:
+                    raise last_err
         except Exception as exc:
             raise RuntimeError(
                 redact_secrets(f"LLM request failed: {exc}", self.settings.configured_secrets())
