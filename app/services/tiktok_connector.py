@@ -253,6 +253,22 @@ class TikTokConnector:
             outcome = self._interpret_publish_response(resp, access_token)
             if (
                 outcome.outcome == "permanent"
+                and publish_mode == "direct_post"
+                and any(
+                    k in outcome.error
+                    for k in (
+                        "unaudited_client_can_only_post_to_private_accounts",
+                        "privacy_level_option_mismatch",
+                        "private",
+                    )
+                )
+            ):
+                body["post_info"]["privacy_level"] = "SELF_ONLY"
+                resp = client.post(endpoint, headers=headers, json=body)
+                outcome = self._interpret_publish_response(resp, access_token)
+
+            if (
+                outcome.outcome == "permanent"
                 and "url_ownership_unverified" in outcome.error
                 and http_client is None
             ):
@@ -309,6 +325,22 @@ class TikTokConnector:
             init_body["post_info"] = post_info
 
         init_resp = client.post(endpoint, headers=headers, json=init_body)
+        outcome = self._interpret_publish_response(init_resp, access_token)
+        if (
+            outcome.outcome == "permanent"
+            and post_info
+            and any(
+                k in outcome.error
+                for k in (
+                    "unaudited_client_can_only_post_to_private_accounts",
+                    "privacy_level_option_mismatch",
+                    "private",
+                )
+            )
+        ):
+            init_body["post_info"]["privacy_level"] = "SELF_ONLY"
+            init_resp = client.post(endpoint, headers=headers, json=init_body)
+
         if init_resp.status_code != 200:
             return self._interpret_publish_response(init_resp, access_token)
 
