@@ -24,15 +24,21 @@ ln -sfn "${APP_ROOT}/shared/data" "${RELEASE_DIR}/data"
 chown -R "${APP_USER}:${APP_USER}" "${RELEASE_DIR}"
 ln -sfn "${RELEASE_DIR}" "${APP_ROOT}/current"
 
-# Install systemd units and Caddyfile.
+# Install systemd units.
 cp "${SRC_DIR}/deployment/systemd/tiktok-bot-web.service" /etc/systemd/system/tiktok-bot-web.service
 cp "${SRC_DIR}/deployment/systemd/tiktok-bot-worker.service" /etc/systemd/system/tiktok-bot-worker.service
-sed "s|{\\$BOT_DOMAIN:bot.example.com}|${BOT_DOMAIN}|g" "${SRC_DIR}/deployment/caddy/Caddyfile" > /etc/caddy/Caddyfile
 
 systemctl daemon-reload
 systemctl enable --now tiktok-bot-web tiktok-bot-worker
 systemctl restart tiktok-bot-web tiktok-bot-worker
-systemctl reload caddy || systemctl restart caddy
+
+# Reload active reverse proxy (Nginx if running, otherwise Caddy).
+if systemctl is-active --quiet nginx; then
+  systemctl reload nginx
+else
+  sed "s|{\\$BOT_DOMAIN:bot.example.com}|${BOT_DOMAIN}|g" "${SRC_DIR}/deployment/caddy/Caddyfile" > /etc/caddy/Caddyfile
+  systemctl reload caddy || systemctl restart caddy
+fi
 
 # Keep last 3 releases to prevent disk bloat.
 ls -1dt "${APP_ROOT}/releases"/* | tail -n +4 | xargs -r rm -rf
